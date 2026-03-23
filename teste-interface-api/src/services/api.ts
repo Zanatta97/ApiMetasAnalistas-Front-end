@@ -1,6 +1,7 @@
 import type {
   Analyst,
   AnalystResultDTO,
+  ErrorResponseDTO,
   Holiday,
   Occurrence,
   Region,
@@ -9,15 +10,89 @@ import type {
 
 const BASE_URL = "";
 
+class ApiError extends Error {
+  statusCode?: number;
+  timestamp?: string;
+
+  constructor(message: string, statusCode?: number, timestamp?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.statusCode = statusCode;
+    this.timestamp = timestamp;
+  }
+}
+
+function parseErrorPayload(payload: unknown): ErrorResponseDTO | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const candidate = payload as Partial<ErrorResponseDTO>;
+  const hasAnyField =
+    typeof candidate.statusCode === "number" ||
+    typeof candidate.errorMessage === "string" ||
+    typeof candidate.statusMessage === "string" ||
+    typeof candidate.timestamp === "string";
+
+  if (!hasAnyField) {
+    return null;
+  }
+
+  return {
+    statusCode: candidate.statusCode,
+    errorMessage: candidate.errorMessage,
+    statusMessage: candidate.statusMessage,
+    timestamp: candidate.timestamp,
+  };
+}
+
+function resolveErrorMessage(
+  parsedError: ErrorResponseDTO | null,
+  fallbackText: string,
+  status: number,
+): string {
+  if (parsedError?.errorMessage) {
+    return parsedError.statusCode
+      ? `[${parsedError.statusCode}] ${parsedError.errorMessage}`
+      : parsedError.errorMessage;
+  }
+
+  if (parsedError?.statusMessage) {
+    return parsedError.statusCode
+      ? `[${parsedError.statusCode}] ${parsedError.statusMessage}`
+      : parsedError.statusMessage;
+  }
+
+  return fallbackText || `Erro ${status}`;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json", Accept: "application/json" },
     ...options,
   });
+
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
-    throw new Error(text || `Erro ${res.status}`);
+
+    let parsedPayload: unknown = null;
+    if (text) {
+      try {
+        parsedPayload = JSON.parse(text);
+      } catch {
+        parsedPayload = null;
+      }
+    }
+
+    const parsedError = parseErrorPayload(parsedPayload);
+    const message = resolveErrorMessage(parsedError, text, res.status);
+    throw new ApiError(
+      message,
+      parsedError?.statusCode ?? res.status,
+      parsedError?.timestamp,
+    );
   }
+
   const text = await res.text();
   return text ? JSON.parse(text) : (undefined as T);
 }

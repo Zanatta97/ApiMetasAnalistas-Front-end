@@ -48,6 +48,13 @@ export interface Ticket {
   dataFechamento: string;
 }
 
+export interface ErrorResponseDTO {
+  statusCode?: number;
+  errorMessage?: string;
+  statusMessage?: string | null;
+  timestamp?: string;
+}
+
 export type Page =
   | "regions"
   | "analysts"
