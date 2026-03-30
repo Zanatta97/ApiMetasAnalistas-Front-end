@@ -8,7 +8,7 @@ export interface Analyst {
   nome: string;
   usuario: string;
   regiaoId: number;
-  regiao?: Region | null;
+  nomeRegiao?: string | null;
   metaDiaria: number;
 }
 
@@ -28,7 +28,6 @@ export interface Holiday {
   data: string;
   descricao: string;
   regiaoId: number;
-  regiao?: Region | null;
 }
 
 export interface Occurrence {
@@ -36,7 +35,6 @@ export interface Occurrence {
   tipo: number;
   descricao: string;
   analistaId: number;
-  analista?: Analyst | null;
   dataInicio: string;
   dataFim: string;
 }
@@ -44,9 +42,27 @@ export interface Occurrence {
 export interface Ticket {
   id?: number;
   analystId: number;
-  analyst?: Analyst | null;
   dataFechamento: string;
 }
+
+export type RegionRequestDTO = Pick<Region, "nome">;
+
+export type AnalystRequestDTO = Pick<
+  Analyst,
+  "nome" | "usuario" | "regiaoId" | "metaDiaria"
+>;
+
+export type HolidayRequestDTO = Pick<
+  Holiday,
+  "data" | "descricao" | "regiaoId"
+>;
+
+export type OccurrenceRequestDTO = Pick<
+  Occurrence,
+  "tipo" | "descricao" | "analistaId" | "dataInicio" | "dataFim"
+>;
+
+export type TicketRequestDTO = Pick<Ticket, "analystId" | "dataFechamento">;
 
 export interface ErrorResponseDTO {
   statusCode?: number;

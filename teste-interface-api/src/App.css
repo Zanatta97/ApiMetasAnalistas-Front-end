@@ -163,6 +163,50 @@
   min-width: 180px;
 }
 
+.combobox {
+  position: relative;
+  width: 280px;
+}
+
+.combobox-full {
+  width: 100%;
+}
+
+.combobox-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.combobox-option {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.combobox-option:hover {
+  background: #fdf8ff;
+}
+
+.combobox-empty {
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
 /* ─── Table ──────────────────────────────────────────────────────────────── */
 .table-wrapper {
   background: var(--bg-card);

@@ -1,11 +1,16 @@
 import type {
   Analyst,
+  AnalystRequestDTO,
   AnalystResultDTO,
   ErrorResponseDTO,
   Holiday,
+  HolidayRequestDTO,
   Occurrence,
+  OccurrenceRequestDTO,
   Region,
+  RegionRequestDTO,
   Ticket,
+  TicketRequestDTO,
 } from "../types";
 
 const BASE_URL = "";
@@ -97,16 +102,59 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return text ? JSON.parse(text) : (undefined as T);
 }
 
+function toRegionRequest(data: Region): RegionRequestDTO {
+  return {
+    nome: data.nome,
+  };
+}
+
+function toAnalystRequest(data: Analyst): AnalystRequestDTO {
+  return {
+    nome: data.nome,
+    usuario: data.usuario,
+    regiaoId: data.regiaoId,
+    metaDiaria: data.metaDiaria,
+  };
+}
+
+function toHolidayRequest(data: Holiday): HolidayRequestDTO {
+  return {
+    data: data.data,
+    descricao: data.descricao,
+    regiaoId: data.regiaoId,
+  };
+}
+
+function toOccurrenceRequest(data: Occurrence): OccurrenceRequestDTO {
+  return {
+    tipo: data.tipo,
+    descricao: data.descricao,
+    analistaId: data.analistaId,
+    dataInicio: data.dataInicio,
+    dataFim: data.dataFim,
+  };
+}
+
+function toTicketRequest(data: Ticket): TicketRequestDTO {
+  return {
+    analystId: data.analystId,
+    dataFechamento: data.dataFechamento,
+  };
+}
+
 // ─── Regions ────────────────────────────────────────────────────────────────
 export const regionsApi = {
   getAll: () => request<Region[]>("/Regions"),
   getById: (id: number) => request<Region>(`/Regions/${id}`),
   create: (data: Region) =>
-    request<void>("/Regions", { method: "POST", body: JSON.stringify(data) }),
+    request<void>("/Regions", {
+      method: "POST",
+      body: JSON.stringify(toRegionRequest(data)),
+    }),
   update: (id: number, data: Region) =>
     request<void>(`/Regions/${id}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(toRegionRequest(data)),
     }),
   delete: (id: number) => request<void>(`/Regions/${id}`, { method: "DELETE" }),
 };
@@ -116,11 +164,14 @@ export const analystsApi = {
   getAll: () => request<Analyst[]>("/Analysts"),
   getById: (id: number) => request<Analyst>(`/Analysts/${id}`),
   create: (data: Analyst) =>
-    request<void>("/Analysts", { method: "POST", body: JSON.stringify(data) }),
+    request<void>("/Analysts", {
+      method: "POST",
+      body: JSON.stringify(toAnalystRequest(data)),
+    }),
   update: (id: number, data: Analyst) =>
     request<void>(`/Analysts/${id}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(toAnalystRequest(data)),
     }),
   delete: (id: number) =>
     request<void>(`/Analysts/${id}`, { method: "DELETE" }),
@@ -147,11 +198,14 @@ export const holidaysApi = {
   getAll: () => request<Holiday[]>("/Holidays"),
   getById: (id: number) => request<Holiday>(`/Holidays/${id}`),
   create: (data: Holiday) =>
-    request<void>("/Holidays", { method: "POST", body: JSON.stringify(data) }),
+    request<void>("/Holidays", {
+      method: "POST",
+      body: JSON.stringify(toHolidayRequest(data)),
+    }),
   update: (id: number, data: Holiday) =>
     request<void>(`/Holidays/${id}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(toHolidayRequest(data)),
     }),
   delete: (id: number) =>
     request<void>(`/Holidays/${id}`, { method: "DELETE" }),
@@ -159,7 +213,8 @@ export const holidaysApi = {
     const params = new URLSearchParams();
     if (startDate) params.append("startDate", startDate);
     if (endDate) params.append("endDate", endDate);
-    return request<Holiday[]>(`/Holidays/period?${params}`);
+    const qs = params.toString() ? `?${params}` : "";
+    return request<Holiday[]>(`/Holidays/period${qs}`);
   },
 };
 
@@ -170,12 +225,12 @@ export const occurrencesApi = {
   create: (data: Occurrence) =>
     request<void>("/Occurrences", {
       method: "POST",
-      body: JSON.stringify(data),
+      body: JSON.stringify(toOccurrenceRequest(data)),
     }),
   update: (id: number, data: Occurrence) =>
     request<void>(`/Occurrences/${id}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(toOccurrenceRequest(data)),
     }),
   delete: (id: number) =>
     request<void>(`/Occurrences/${id}`, { method: "DELETE" }),
@@ -185,7 +240,8 @@ export const occurrencesApi = {
     const params = new URLSearchParams();
     if (startDate) params.append("startDate", startDate);
     if (endDate) params.append("endDate", endDate);
-    return request<Occurrence[]>(`/Occurrences/period?${params}`);
+    const qs = params.toString() ? `?${params}` : "";
+    return request<Occurrence[]>(`/Occurrences/period${qs}`);
   },
 };
 
@@ -194,11 +250,14 @@ export const ticketsApi = {
   getAll: () => request<Ticket[]>("/Tickets"),
   getById: (id: number) => request<Ticket>(`/Tickets/${id}`),
   create: (data: Ticket) =>
-    request<void>("/Tickets", { method: "POST", body: JSON.stringify(data) }),
+    request<void>("/Tickets", {
+      method: "POST",
+      body: JSON.stringify(toTicketRequest(data)),
+    }),
   update: (id: number, data: Ticket) =>
     request<void>(`/Tickets/${id}`, {
       method: "PUT",
-      body: JSON.stringify(data),
+      body: JSON.stringify(toTicketRequest(data)),
     }),
   delete: (id: number) => request<void>(`/Tickets/${id}`, { method: "DELETE" }),
   getByAnalyst: (idAnalista: number) =>

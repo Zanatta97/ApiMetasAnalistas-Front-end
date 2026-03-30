@@ -42,11 +42,17 @@ export function OccurrencesPage() {
   const [analysts, setAnalysts] = useState<Analyst[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterAnalyst, setFilterAnalyst] = useState<string>("");
+  const [filterAnalystId, setFilterAnalystId] = useState<number | null>(null);
+  const [filterAnalystQuery, setFilterAnalystQuery] = useState("");
+  const [showFilterAnalystOptions, setShowFilterAnalystOptions] =
+    useState(false);
   const [startDate, setStartDate] = useState(firstOfMonth());
   const [endDate, setEndDate] = useState(lastOfMonth());
   const [usePeriod, setUsePeriod] = useState(true);
   const [editing, setEditing] = useState<Occurrence | null>(null);
+  const [editingAnalystQuery, setEditingAnalystQuery] = useState("");
+  const [showEditingAnalystOptions, setShowEditingAnalystOptions] =
+    useState(false);
   const [showModal, setShowModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Occurrence | null>(null);
   const { toasts, show, remove } = useToast();
@@ -54,22 +60,45 @@ export function OccurrencesPage() {
   const load = useCallback(
     async (period?: boolean) => {
       setLoading(true);
-      try {
-        const data =
-          period && startDate && endDate
-            ? await occurrencesApi.getByPeriod(
-                new Date(startDate).toISOString(),
-                new Date(endDate).toISOString(),
-              )
-            : await occurrencesApi.getAll();
-        const a = await analystsApi.getAll();
-        setOccurrences(data);
-        setAnalysts(a);
-      } catch (e: any) {
-        show(e.message, "error");
-      } finally {
-        setLoading(false);
+      const [occurrencesResult, analystsResult] = await Promise.allSettled([
+        period && startDate && endDate
+          ? occurrencesApi.getByPeriod(
+              new Date(startDate).toISOString(),
+              new Date(endDate).toISOString(),
+            )
+          : occurrencesApi.getAll(),
+        analystsApi.getAll(),
+      ]);
+
+      if (occurrencesResult.status === "fulfilled") {
+        setOccurrences(
+          occurrencesResult.value.map((o) => ({
+            ...o,
+            id: o.id != null ? Number(o.id) : undefined,
+            tipo: Number(o.tipo),
+            analistaId: Number(o.analistaId),
+          })),
+        );
+      } else {
+        setOccurrences([]);
+        show("Nao foi possivel carregar as ocorrencias.", "error");
       }
+
+      if (analystsResult.status === "fulfilled") {
+        setAnalysts(
+          analystsResult.value.map((a) => ({
+            ...a,
+            id: a.id != null ? Number(a.id) : undefined,
+            regiaoId: Number(a.regiaoId),
+            metaDiaria: Number(a.metaDiaria),
+          })),
+        );
+      } else {
+        setAnalysts([]);
+        show("Nao foi possivel carregar os analistas.", "error");
+      }
+
+      setLoading(false);
     },
     [startDate, endDate, show],
   );
@@ -79,23 +108,46 @@ export function OccurrencesPage() {
   }, [load]);
 
   const analystName = (id: number) =>
-    analysts.find((a) => a.id === id)?.nome ?? "-";
+    analysts.find((a) => Number(a.id) === Number(id))?.nome ?? "-";
+
+  const filteredAnalystsForFilter = analysts
+    .filter((a) =>
+      a.nome.toLowerCase().includes(filterAnalystQuery.toLowerCase()),
+    )
+    .slice(0, 10);
+
+  const filteredAnalystsForEditing = analysts
+    .filter((a) =>
+      a.nome.toLowerCase().includes(editingAnalystQuery.toLowerCase()),
+    )
+    .slice(0, 10);
 
   const openCreate = () => {
     setEditing(emptyOccurrence());
+    setEditingAnalystQuery("");
+    setShowEditingAnalystOptions(false);
     setShowModal(true);
   };
   const openEdit = (o: Occurrence) => {
+    const analystId = Number(o.analistaId);
+    const currentAnalystName = analystName(analystId);
     setEditing({
       ...o,
+      analistaId: analystId,
       dataInicio: o.dataInicio.slice(0, 10),
       dataFim: o.dataFim.slice(0, 10),
     });
+    setEditingAnalystQuery(
+      currentAnalystName === "-" ? "" : currentAnalystName,
+    );
+    setShowEditingAnalystOptions(false);
     setShowModal(true);
   };
   const closeModal = () => {
     setShowModal(false);
     setEditing(null);
+    setEditingAnalystQuery("");
+    setShowEditingAnalystOptions(false);
   };
 
   const handleSave = async () => {
@@ -144,7 +196,8 @@ export function OccurrencesPage() {
       o.descricao.toLowerCase().includes(search.toLowerCase()) ||
       analystName(o.analistaId).toLowerCase().includes(search.toLowerCase());
     const matchAnalyst =
-      filterAnalyst === "" || o.analistaId === Number(filterAnalyst);
+      filterAnalystId === null ||
+      Number(o.analistaId) === Number(filterAnalystId);
     return matchSearch && matchAnalyst;
   });
 
@@ -171,18 +224,57 @@ export function OccurrencesPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select
-          className="form-input toolbar-select"
-          value={filterAnalyst}
-          onChange={(e) => setFilterAnalyst(e.target.value)}
-        >
-          <option value="">Todos os analistas</option>
-          {analysts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nome}
-            </option>
-          ))}
-        </select>
+        <div className="combobox toolbar-select">
+          <input
+            className="form-input"
+            value={filterAnalystQuery}
+            placeholder="Filtrar por analista..."
+            onFocus={() => setShowFilterAnalystOptions(true)}
+            onBlur={() => {
+              setTimeout(() => setShowFilterAnalystOptions(false), 120);
+            }}
+            onChange={(e) => {
+              setFilterAnalystQuery(e.target.value);
+              setFilterAnalystId(null);
+              setShowFilterAnalystOptions(true);
+            }}
+          />
+          {showFilterAnalystOptions && (
+            <div className="combobox-menu">
+              <button
+                className="combobox-option"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setFilterAnalystId(null);
+                  setFilterAnalystQuery("");
+                  setShowFilterAnalystOptions(false);
+                }}
+              >
+                Todos os analistas
+              </button>
+              {filteredAnalystsForFilter.length === 0 ? (
+                <div className="combobox-empty">
+                  Nenhum analista encontrado.
+                </div>
+              ) : (
+                filteredAnalystsForFilter.map((a) => (
+                  <button
+                    key={a.id}
+                    className="combobox-option"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setFilterAnalystId(Number(a.id));
+                      setFilterAnalystQuery(a.nome);
+                      setShowFilterAnalystOptions(false);
+                    }}
+                  >
+                    {a.nome}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="toolbar">
@@ -293,20 +385,46 @@ export function OccurrencesPage() {
         >
           <div className="form-group">
             <label className="form-label">Analista *</label>
-            <select
-              className="form-input"
-              value={editing.analistaId}
-              onChange={(e) =>
-                setEditing({ ...editing, analistaId: Number(e.target.value) })
-              }
-            >
-              <option value={0}>Selecione...</option>
-              {analysts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nome}
-                </option>
-              ))}
-            </select>
+            <div className="combobox combobox-full">
+              <input
+                className="form-input"
+                value={editingAnalystQuery}
+                placeholder="Digite para buscar analista..."
+                onFocus={() => setShowEditingAnalystOptions(true)}
+                onBlur={() => {
+                  setTimeout(() => setShowEditingAnalystOptions(false), 120);
+                }}
+                onChange={(e) => {
+                  setEditingAnalystQuery(e.target.value);
+                  setEditing({ ...editing, analistaId: 0 });
+                  setShowEditingAnalystOptions(true);
+                }}
+              />
+              {showEditingAnalystOptions && (
+                <div className="combobox-menu">
+                  {filteredAnalystsForEditing.length === 0 ? (
+                    <div className="combobox-empty">
+                      Nenhum analista encontrado.
+                    </div>
+                  ) : (
+                    filteredAnalystsForEditing.map((a) => (
+                      <button
+                        key={a.id}
+                        className="combobox-option"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setEditing({ ...editing, analistaId: Number(a.id) });
+                          setEditingAnalystQuery(a.nome);
+                          setShowEditingAnalystOptions(false);
+                        }}
+                      >
+                        {a.nome}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Tipo *</label>

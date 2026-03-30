@@ -18,26 +18,53 @@ export function TicketsPage() {
   const [analysts, setAnalysts] = useState<Analyst[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterAnalyst, setFilterAnalyst] = useState<string>("");
+  const [filterAnalystId, setFilterAnalystId] = useState<number | null>(null);
+  const [filterAnalystQuery, setFilterAnalystQuery] = useState("");
+  const [showFilterAnalystOptions, setShowFilterAnalystOptions] =
+    useState(false);
   const [editing, setEditing] = useState<Ticket | null>(null);
+  const [editingAnalystQuery, setEditingAnalystQuery] = useState("");
+  const [showEditingAnalystOptions, setShowEditingAnalystOptions] =
+    useState(false);
   const [showModal, setShowModal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Ticket | null>(null);
   const { toasts, show, remove } = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
-    try {
-      const [t, a] = await Promise.all([
-        ticketsApi.getAll(),
-        analystsApi.getAll(),
-      ]);
-      setTickets(t);
-      setAnalysts(a);
-    } catch (e: any) {
-      show(e.message, "error");
-    } finally {
-      setLoading(false);
+    const [ticketsResult, analystsResult] = await Promise.allSettled([
+      ticketsApi.getAll(),
+      analystsApi.getAll(),
+    ]);
+
+    if (ticketsResult.status === "fulfilled") {
+      setTickets(
+        ticketsResult.value.map((t) => ({
+          ...t,
+          id: t.id != null ? Number(t.id) : undefined,
+          analystId: Number(t.analystId),
+        })),
+      );
+    } else {
+      setTickets([]);
+      show("Nao foi possivel carregar os tickets.", "error");
     }
+
+    if (analystsResult.status === "fulfilled") {
+      setAnalysts(
+        analystsResult.value.map((a) => ({
+          ...a,
+          id: a.id != null ? Number(a.id) : undefined,
+          regiaoId: Number(a.regiaoId),
+          metaDiaria: Number(a.metaDiaria),
+        })),
+      );
+    } else {
+      setAnalysts([]);
+      show("Nao foi possivel carregar os analistas.", "error");
+    }
+
+    setLoading(false);
   }, [show]);
 
   useEffect(() => {
@@ -45,19 +72,41 @@ export function TicketsPage() {
   }, [load]);
 
   const analystName = (id: number) =>
-    analysts.find((a) => a.id === id)?.nome ?? "-";
+    analysts.find((a) => Number(a.id) === Number(id))?.nome ?? "-";
+
+  const filteredAnalystsForFilter = analysts
+    .filter((a) =>
+      a.nome.toLowerCase().includes(filterAnalystQuery.toLowerCase()),
+    )
+    .slice(0, 10);
+
+  const filteredAnalystsForEditing = analysts
+    .filter((a) =>
+      a.nome.toLowerCase().includes(editingAnalystQuery.toLowerCase()),
+    )
+    .slice(0, 10);
 
   const openCreate = () => {
     setEditing(emptyTicket());
+    setEditingAnalystQuery("");
+    setShowEditingAnalystOptions(false);
     setShowModal(true);
   };
   const openEdit = (t: Ticket) => {
+    const analystId = Number(t.analystId);
+    const currentAnalystName = analystName(analystId);
     setEditing({ ...t, dataFechamento: t.dataFechamento.slice(0, 10) });
+    setEditingAnalystQuery(
+      currentAnalystName === "-" ? "" : currentAnalystName,
+    );
+    setShowEditingAnalystOptions(false);
     setShowModal(true);
   };
   const closeModal = () => {
     setShowModal(false);
     setEditing(null);
+    setEditingAnalystQuery("");
+    setShowEditingAnalystOptions(false);
   };
 
   const handleSave = async () => {
@@ -110,7 +159,8 @@ export function TicketsPage() {
       .toLowerCase()
       .includes(search.toLowerCase());
     const matchAnalyst =
-      filterAnalyst === "" || t.analystId === Number(filterAnalyst);
+      filterAnalystId === null ||
+      Number(t.analystId) === Number(filterAnalystId);
     return matchSearch && matchAnalyst;
   });
 
@@ -149,18 +199,57 @@ export function TicketsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <select
-          className="form-input toolbar-select"
-          value={filterAnalyst}
-          onChange={(e) => setFilterAnalyst(e.target.value)}
-        >
-          <option value="">Todos os analistas</option>
-          {analysts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.nome}
-            </option>
-          ))}
-        </select>
+        <div className="combobox toolbar-select">
+          <input
+            className="form-input"
+            value={filterAnalystQuery}
+            placeholder="Filtrar por analista..."
+            onFocus={() => setShowFilterAnalystOptions(true)}
+            onBlur={() => {
+              setTimeout(() => setShowFilterAnalystOptions(false), 120);
+            }}
+            onChange={(e) => {
+              setFilterAnalystQuery(e.target.value);
+              setFilterAnalystId(null);
+              setShowFilterAnalystOptions(true);
+            }}
+          />
+          {showFilterAnalystOptions && (
+            <div className="combobox-menu">
+              <button
+                className="combobox-option"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setFilterAnalystId(null);
+                  setFilterAnalystQuery("");
+                  setShowFilterAnalystOptions(false);
+                }}
+              >
+                Todos os analistas
+              </button>
+              {filteredAnalystsForFilter.length === 0 ? (
+                <div className="combobox-empty">
+                  Nenhum analista encontrado.
+                </div>
+              ) : (
+                filteredAnalystsForFilter.map((a) => (
+                  <button
+                    key={a.id}
+                    className="combobox-option"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setFilterAnalystId(Number(a.id));
+                      setFilterAnalystQuery(a.nome);
+                      setShowFilterAnalystOptions(false);
+                    }}
+                  >
+                    {a.nome}
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -223,20 +312,46 @@ export function TicketsPage() {
         >
           <div className="form-group">
             <label className="form-label">Analista *</label>
-            <select
-              className="form-input"
-              value={editing.analystId}
-              onChange={(e) =>
-                setEditing({ ...editing, analystId: Number(e.target.value) })
-              }
-            >
-              <option value={0}>Selecione...</option>
-              {analysts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nome}
-                </option>
-              ))}
-            </select>
+            <div className="combobox combobox-full">
+              <input
+                className="form-input"
+                value={editingAnalystQuery}
+                placeholder="Digite para buscar analista..."
+                onFocus={() => setShowEditingAnalystOptions(true)}
+                onBlur={() => {
+                  setTimeout(() => setShowEditingAnalystOptions(false), 120);
+                }}
+                onChange={(e) => {
+                  setEditingAnalystQuery(e.target.value);
+                  setEditing({ ...editing, analystId: 0 });
+                  setShowEditingAnalystOptions(true);
+                }}
+              />
+              {showEditingAnalystOptions && (
+                <div className="combobox-menu">
+                  {filteredAnalystsForEditing.length === 0 ? (
+                    <div className="combobox-empty">
+                      Nenhum analista encontrado.
+                    </div>
+                  ) : (
+                    filteredAnalystsForEditing.map((a) => (
+                      <button
+                        key={a.id}
+                        className="combobox-option"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setEditing({ ...editing, analystId: Number(a.id) });
+                          setEditingAnalystQuery(a.nome);
+                          setShowEditingAnalystOptions(false);
+                        }}
+                      >
+                        {a.nome}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Data de Fechamento *</label>
