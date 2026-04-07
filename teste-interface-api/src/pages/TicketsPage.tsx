@@ -146,13 +146,27 @@ export function TicketsPage() {
     ? editing.analystId > 0 && !!editing.dataFechamento
     : false;
 
-  // Group by analyst for summary
+  // Aggregate summary to keep layout scalable with many analysts
   const ticketsByAnalyst = analysts
     .map((a) => ({
       analyst: a,
       count: tickets.filter((t) => t.analystId === a.id).length,
     }))
     .filter((x) => x.count > 0);
+
+  const analystsWithTicketsCount = ticketsByAnalyst.length;
+  const avgTicketsPerAnalyst =
+    analystsWithTicketsCount > 0
+      ? ticketsByAnalyst.reduce((acc, item) => acc + item.count, 0) /
+        analystsWithTicketsCount
+      : 0;
+  const topAnalystEntry = ticketsByAnalyst.reduce<{
+    analyst: Analyst;
+    count: number;
+  } | null>((top, current) => {
+    if (!top || current.count > top.count) return current;
+    return top;
+  }, null);
 
   const filtered = tickets.filter((t) => {
     const matchSearch = analystName(t.analystId)
@@ -181,14 +195,25 @@ export function TicketsPage() {
       </div>
 
       {ticketsByAnalyst.length > 0 && (
-        <div className="summary-cards">
-          {ticketsByAnalyst.map(({ analyst, count }) => (
-            <div key={analyst.id} className="summary-card">
-              <span className="summary-name">{analyst.nome}</span>
-              <span className="summary-count">{count}</span>
-              <span className="summary-label">tickets</span>
-            </div>
-          ))}
+        <div className="summary-panel">
+          <div className="summary-item">
+            <span className="summary-label">Analistas com tickets</span>
+            <span className="summary-value">{analystsWithTicketsCount}</span>
+          </div>
+          <div className="summary-item">
+            <span className="summary-label">Media por analista</span>
+            <span className="summary-value">
+              {avgTicketsPerAnalyst.toFixed(1)}
+            </span>
+          </div>
+          <div className="summary-item summary-item-wide">
+            <span className="summary-label">Maior volume</span>
+            <span className="summary-value">
+              {topAnalystEntry
+                ? `${topAnalystEntry.analyst.nome} (${topAnalystEntry.count})`
+                : "-"}
+            </span>
+          </div>
         </div>
       )}
 
